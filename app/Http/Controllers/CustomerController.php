@@ -29,6 +29,7 @@ class CustomerController extends Controller
 
     public function index(Request $request)
     {
+
         $status = $request->has('status') && $request->status !== '' ? $request->status : null;
         if($status!=null)
         {
