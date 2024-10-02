@@ -3,6 +3,11 @@
 # Navigate to the project directory
 cd /home/azureadmin/aicerts_aibubble_backend || exit
 
+# Load environment variables from .env file if it exists
+if [ -f .env ]; then
+  export $(grep -v '^#' .env | xargs)
+fi
+
 # Set ownership to the current user and www-data (used by the web server)
 echo "Setting proper permissions for storage and cache directories..."
 sudo chown -R $(whoami):www-data storage bootstrap/cache
@@ -42,4 +47,4 @@ php artisan db:seed --force
 
 # Start the Laravel application using PM2
 echo "Starting Laravel app with PM2..."
-pm2 start php --name "laravel-app" -- artisan serve --host 10.2.3.56  --port 7034
+pm2 start php --name "laravel-app" -- artisan serve --host $PM2_HOST  --port $PM2_PORT
