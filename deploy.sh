@@ -1,38 +1,45 @@
 #!/bin/bash
 
 # Navigate to the project directory
-# cd /aicerts_aibubble_backend
+cd /home/azureadmin/aicerts_aibubble_backend || exit
 
-# Step 1: Set proper permissions for the Laravel storage and cache directories
-echo "Setting permissions for storage and bootstrap/cache..."
-sudo chown -R www-data:www-data storage bootstrap/cache
+# Set ownership to the current user and www-data (used by the web server)
+echo "Setting proper permissions for storage and cache directories..."
+sudo chown -R $(whoami):www-data storage bootstrap/cache
 sudo chmod -R 775 storage bootstrap/cache
 
-# Step 2: Install dependencies via Composer
+# Create necessary directories and files if they don't exist
+echo "Ensuring the log file and cache directories exist..."
+mkdir -p storage/logs bootstrap/cache
+touch storage/logs/laravel.log
+
+# Install composer dependencies
 echo "Installing Composer dependencies..."
 composer install --no-interaction --prefer-dist --optimize-autoloader
 
-# Step 3: Generate Laravel application key
-echo "Generating Laravel application key..."
-php artisan key:generate
-
-# Step 4: Run database migrations
-echo "Running migrations..."
-php artisan migrate --force
-
-# Step 5: Clear and cache configurations
-echo "Clearing and caching config..."
+# Clear and cache config
+echo "Clearing and caching Laravel configuration..."
 php artisan config:clear
 php artisan config:cache
-php artisan route:cache
 
-# Step 6: Restart or start the Laravel application using PM2
-echo "Restarting PM2 process..."
-pm2 delete laravel-app
-pm2 start php --name "laravel-app" -- artisan serve --host 10.2.3.50 --port 7034
+# Generate application key if not present
+echo "Generating application key..."
+php artisan key:generate
 
-# Step 7: Save PM2 process
-echo "Saving PM2 process list..."
-pm2 save
+# Delete the permission migration
+echo "Deleting the permission migration..."
+rm -f database/migrations/2022_01_12_173356_create_permission_tables.php
 
-echo "Deployment complete!"
+# Publish the Spatie permission configuration
+echo "Publishing Spatie permission configuration..."
+php artisan vendor:publish --provider="Spatie\Permission\PermissionServiceProvider"
+
+
+# Run migrations and seed the database
+echo "Running migrations and seeding database..."
+php artisan migrate --force
+php artisan db:seed --force
+
+# Start the Laravel application using PM2
+echo "Starting Laravel app with PM2..."
+pm2 start php --name "laravel-app" -- artisan serve --host 10.2.3.56  --port 7034
