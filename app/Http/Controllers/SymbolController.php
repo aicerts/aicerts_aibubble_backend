@@ -151,7 +151,9 @@ class SymbolController extends Controller
     }
 
     public function search_symbol(Request $request)
+
     {
+        
         $accessKey = 'b242b15c327b3332565729379530467d';
         $exchange = 'IEXG';
         $searchQuery = $request->input('search');

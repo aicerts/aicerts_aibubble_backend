@@ -36,7 +36,7 @@ class StocksController extends Controller
             });
 
             if ($files->isNotEmpty()) {
-                $data['image'] = asset('stocks/assets/'.$files->first()->getRelativePathname());
+                $data['image'] = asset('/stocks/assets/'.$files->first()->getRelativePathname());
             }
             $updatedJson[] = $data;
         }

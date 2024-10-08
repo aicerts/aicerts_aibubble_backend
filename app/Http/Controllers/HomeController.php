@@ -42,7 +42,7 @@ class HomeController extends Controller
             });
 
             if ($files->isNotEmpty()) {
-                $data['image'] = asset('stocks/assets/' . $files->first()->getRelativePathname());
+                $data['image'] = asset('/stocks/assets/' . $files->first()->getRelativePathname());
             }
             $updatedSymbols[] = $data;
         }
