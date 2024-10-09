@@ -47,13 +47,3 @@ Route::middleware('auth.customer:api')->group(function () {
 
 Route::get('stocks/data', [StocksController::class, 'stocks_data']);
 Route::get('stocks/chart/{symbol}/{interval}', [StocksController::class, 'stocks_chart']);
-
-Route::get('/stocks/assets/{filename}', function ($filename) {
-    $path = public_path('stocks/assets/' . $filename);
-
-    if (!File::exists($path)) {
-        abort(404); // File not found
-    }
-
-    return Response::file($path);
-});
