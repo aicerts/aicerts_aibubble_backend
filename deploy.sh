@@ -48,3 +48,7 @@ php artisan db:seed --force
 # Start the Laravel application using PM2
 echo "Starting Laravel app with PM2..."
 pm2 start php --name "laravel-app" -- artisan serve --host $PM2_HOST  --port $PM2_PORT
+
+# Set up a cron job to run the Laravel scheduler every 5 minutes
+echo "Setting up cron job for Laravel scheduler..."
+(crontab -l; echo "*/5 * * * * php /home/azureadmin/aicerts_aibubble_backend/artisan schedule:run >> /dev/null 2>&1") | crontab -

@@ -19,7 +19,7 @@ class Helpers
     {
         $this->client = new Client();
         $this->apiKey = env('MARKET_API_KEY');
-        $this->baseUrl = 'http://api.marketstack.com/v1/';
+        $this->baseUrl = 'https://api.marketstack.com/v1/';
         $this->jsonData = json_decode(file_get_contents(public_path('stocks/marketstack.json')), true);
     }
 
@@ -80,7 +80,7 @@ class Helpers
     public static function getEODData($symbol)
     {
         $apiKey = env('MARKET_API_KEY');
-        $url = "http://api.marketstack.com/v1/eod?access_key={$apiKey}&symbols={$symbol}&limit=366"; // Adjust limit as needed
+        $url = "https://api.marketstack.com/v1/eod?access_key={$apiKey}&symbols={$symbol}&limit=366"; // Adjust limit as needed
 
         try {
             $response = Http::withoutVerifying()->get($url);
@@ -94,7 +94,7 @@ class Helpers
     public static function getIntradayData($symbol, $interval = '1min', $limit = '61')
     {
         $apiKey = env('MARKET_API_KEY');
-        $url = "http://api.marketstack.com/v1/intraday?access_key={$apiKey}&symbols={$symbol}&interval={$interval}&limit={$limit}";
+        $url = "https://api.marketstack.com/v1/intraday?access_key={$apiKey}&symbols={$symbol}&interval={$interval}&limit={$limit}";
 
         try {
             $response = Http::withoutVerifying()->get($url);
@@ -241,6 +241,7 @@ class Helpers
 
         $path = public_path('stocks/marketstack.json');
         File::put($path, json_encode($jsonData));
+        Log::info('Intraday data updated successfully..');
     }
 
     public function getPricesForEOD()
