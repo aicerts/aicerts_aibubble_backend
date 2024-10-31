@@ -115,27 +115,31 @@ class Helpers
 
     public static function getPriceEOD($symbol)
     {
-        $baseUrl = env('PERFORMANCE_API_URL');
-    
-        // Call the API to get performance data using the base URL from the environment
-        $response = Http::get("{$baseUrl}/v1/crypto/fetch/performance/{$symbol}");
-
-    
-        // Check if the response is successful and contains data
-        if ($response->successful() && isset($response->json()['performance'])) {
-            $performance = $response->json()['performance'];
-            $latestEODPrice = $response->json()['price'];
-            $latestEODVolume = $response->json()['volume'];
-
-        } else {
-            // Handle the case where the API call fails or returns no data
+        try {
+            $baseUrl = env('PERFORMANCE_API_URL');
+            $response = Http::retry(3, 100) // Retry mechanism
+                           ->get("{$baseUrl}/v1/crypto/fetch/performance/{$symbol}");
+            
+            if ($response->successful() && isset($response->json()['performance'])) {
+                $performance = $response->json()['performance'];
+                $latestEODPrice = $response->json()['price'];
+                $latestEODVolume = $response->json()['volume'];
+            } else {
+                throw new \Exception("No performance data returned from API");
+            }
+        } catch (\Exception $e) {
+            // Log the error message and continue gracefully
+            \Log::error("Failed to connect to API: " . $e->getMessage());
             $performance = [
-                'day' => null,
-                'week' => null,
-                'month' => null,
-                'year' => null,
+                'day' => 0,
+                'week' => 0,
+                'month' => 0,
+                'year' => 0,
             ];
+            $latestEODPrice = 0;
+            $latestEODVolume = 0;
         }
+    
         return [
             'symbol' => $symbol,
             'performance' => $performance,
