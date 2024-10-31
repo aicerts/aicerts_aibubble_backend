@@ -80,7 +80,7 @@ class Helpers
     public static function getEODData($symbol)
     {
         $apiKey = env('MARKET_API_KEY');
-        $url = "https://api.marketstack.com/v1/eod?access_key={$apiKey}&symbols={$symbol}&limit=366"; // Adjust limit as needed
+        $url = "https://api.marketstack.com/v1/eod?access_key={$apiKey}&symbols={$symbol}&limit=365"; // Adjust limit as needed
 
         try {
             $response = Http::withoutVerifying()->get($url);
@@ -115,48 +115,36 @@ class Helpers
 
     public static function getPriceEOD($symbol)
     {
-        $eodData = self::getEODData($symbol);
+        $baseUrl = env('PERFORMANCE_API_URL');
+    
+        // Call the API to get performance data using the base URL from the environment
+        $response = Http::get("{$baseUrl}/v1/crypto/fetch/performance/{$symbol}");
 
-        if (empty($eodData)) {
-            return [
-                'performance' => [
-                    'day' => 0,
-                    'week' => 0,
-                    'month' => 0,
-                    'year' => 0,
-                ],
-                'price' => 0,
-                'volume' => 0,
-                'volumeWeekly' => 0,
+    
+        // Check if the response is successful and contains data
+        if ($response->successful() && isset($response->json()['performance'])) {
+            $performance = $response->json()['performance'];
+            $latestEODPrice = $response->json()['price'];
+            $latestEODVolume = $response->json()['volume'];
+
+        } else {
+            // Handle the case where the API call fails or returns no data
+            $performance = [
+                'day' => null,
+                'week' => null,
+                'month' => null,
+                'year' => null,
             ];
         }
-
-        $latestEODPrice = $eodData[0]['close'];
-        $latestEODVolume = $eodData[0]['volume'];
-        $reversed = array_reverse($eodData);
-        $weekly = self::convertCandles($reversed, 'weekly');
-        $monthly = self::convertCandles($reversed, 'monthly');
-        $yearly = self::convertCandles($reversed, 'yearly');
-
-        $findEODPrice = function ($daysAgo) use ($eodData) {
-            return $eodData[$daysAgo]['close'] ?? null;
-        };
-
-        $performance = [
-            'day' => self::calculateChange($findEODPrice(1), $latestEODPrice),
-            'week' => self::calculateChange($weekly[1]['close'], $weekly[0]['close']),
-            'month' => self::calculateChange($monthly[1]['close'], $monthly[0]['close']),
-            'year' => self::calculateChange($yearly[1]['close'], $yearly[0]['close']),
-        ];
-
         return [
             'symbol' => $symbol,
             'performance' => $performance,
             'price' => $latestEODPrice,
             'volume' => $latestEODVolume,
-            'volumeWeekly' => $weekly[0]['volume'],
+            'volumeWeekly' => $latestEODVolume,
         ];
     }
+    
 
     public static function getPriceIntraday($symbol)
     {
