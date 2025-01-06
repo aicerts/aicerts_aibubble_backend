@@ -77,13 +77,46 @@ class Helpers
         return array_values($groupedData);
     }
 
+    private static function fillMissingDates($eodData)
+    {
+        $filledEODData = [];
+        $lastKnown = null;
+    
+        // Iterate over the data to fill missing dates
+        foreach ($eodData as $index => $entry) {
+            if ($lastKnown) {
+                // Check if there's a gap in the dates, assume the data is sorted
+                $dateDifference = strtotime($entry['date']) - strtotime($lastKnown['date']);
+                // If there's a gap of more than 1 day, fill in the missing data
+                while ($dateDifference > 86400) { // 86400 seconds = 1 day
+                    $lastKnown['date'] = date('Y-m-d', strtotime($lastKnown['date'] . ' +1 day'));
+                    $filledEODData[] = [
+                        'date' => $lastKnown['date'],
+                        'close' => $lastKnown['close'],
+                        'volume' => $lastKnown['volume'],
+                    ];
+                    $dateDifference -= 86400; // Reduce the gap by one day
+                }
+            }
+    
+            // Add the current data entry to the result
+            $filledEODData[] = $entry;
+            $lastKnown = $entry;
+        }
+    
+        return $filledEODData;
+    }
+
+
     public static function getEODData($symbol)
     {
         $apiKey = env('MARKET_API_KEY');
-        $url = "https://api.marketstack.com/v1/eod?access_key={$apiKey}&symbols={$symbol}&limit=365"; // Adjust limit as needed
+        $url = "https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${symbol}&outputsize=full&apikey=${apikey}"; // Adjust limit as needed
+        // $url = "https://api.marketstack.com/v1/eod?access_key={$apiKey}&symbols={$symbol}&limit=365"; 
 
         try {
             $response = Http::withoutVerifying()->get($url);
+            Log::info($response);
             return $response->json()['data'];
         } catch (\Exception $e) {
             report($e);
@@ -94,7 +127,8 @@ class Helpers
     public static function getIntradayData($symbol, $interval = '1min', $limit = '61')
     {
         $apiKey = env('MARKET_API_KEY');
-        $url = "https://api.marketstack.com/v1/intraday?access_key={$apiKey}&symbols={$symbol}&interval={$interval}&limit={$limit}";
+        $url="https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol={$symbol}&apikey=${apikey}";
+        // $url = "https://api.marketstack.com/v1/intraday?access_key={$apiKey}&symbols={$symbol}&interval={$interval}&limit={$limit}";
 
         try {
             $response = Http::withoutVerifying()->get($url);
@@ -113,39 +147,87 @@ class Helpers
         return 0;
     }
 
+    // public static function getPriceEOD($symbol)
+    // {
+    //     try {
+    //         $baseUrl = env('PERFORMANCE_API_URL');
+    //         $response = Http::retry(3, 100) // Retry mechanism
+    //                        ->get("{$baseUrl}/v1/crypto/fetch/performance/{$symbol}");
+            
+    //         if ($response->successful() && isset($response->json()['performance'])) {
+    //             $performance = $response->json()['performance'];
+    //             $latestEODPrice = $response->json()['price'];
+    //             $latestEODVolume = $response->json()['volume'];
+    //         } else {
+    //             throw new \Exception("No performance data returned from API");
+    //         }
+    //     } catch (\Exception $e) {
+    //         // Log the error message and continue gracefully
+    //         \Log::error("Failed to connect to API: " . $e->getMessage());
+    //         $performance = [
+    //             'day' => 0,
+    //             'week' => 0,
+    //             'month' => 0,
+    //             'year' => 0,
+    //         ];
+    //         $latestEODPrice = 0;
+    //         $latestEODVolume = 0;
+    //     }
+    
+    //     return [
+    //         'symbol' => $symbol,
+    //         'performance' => $performance,
+    //         'price' => $latestEODPrice,
+    //         'volume' => $latestEODVolume,
+    //         'volumeWeekly' => $latestEODVolume,
+    //     ];
+    // }
+
     public static function getPriceEOD($symbol)
     {
-        try {
-            $baseUrl = env('PERFORMANCE_API_URL');
-            $response = Http::retry(3, 100) // Retry mechanism
-                           ->get("{$baseUrl}/v1/crypto/fetch/performance/{$symbol}");
-            
-            if ($response->successful() && isset($response->json()['performance'])) {
-                $performance = $response->json()['performance'];
-                $latestEODPrice = $response->json()['price'];
-                $latestEODVolume = $response->json()['volume'];
-            } else {
-                throw new \Exception("No performance data returned from API");
-            }
-        } catch (\Exception $e) {
-            // Log the error message and continue gracefully
-            \Log::error("Failed to connect to API: " . $e->getMessage());
-            $performance = [
-                'day' => 0,
-                'week' => 0,
-                'month' => 0,
-                'year' => 0,
+        $eodData = self::getEODData($symbol);
+    
+        if (empty($eodData)) {
+            return [
+                'performance' => [
+                    'day' => 0,
+                    'week' => 0,
+                    'month' => 0,
+                    'year' => 0,
+                ],
+                'price' => 0,
+                'volume' => 0,
+                'volumeWeekly' => 0,
             ];
-            $latestEODPrice = 0;
-            $latestEODVolume = 0;
         }
+    
+        // Fill missing dates by copying the last known data
+        $filledEODData = self::fillMissingDates($eodData);
+    
+        $latestEODPrice = $filledEODData[0]['close'];
+        $latestEODVolume = $filledEODData[0]['volume'];
+        $reversed = array_reverse($filledEODData);
+        $weekly = self::convertCandles($reversed, 'weekly');
+        $monthly = self::convertCandles($reversed, 'monthly');
+        $yearly = self::convertCandles($reversed, 'yearly');
+    
+        $findEODPrice = function ($daysAgo) use ($filledEODData) {
+            return $filledEODData[$daysAgo]['close'] ?? null;
+        };
+    
+        $performance = [
+            'day' => self::calculateChange($findEODPrice(1), $latestEODPrice),
+            'week' => self::calculateChange($weekly[1]['close'], $weekly[0]['close']),
+            'month' => self::calculateChange($monthly[1]['close'], $monthly[0]['close']),
+            'year' => self::calculateChange($yearly[1]['close'], $yearly[0]['close']),
+        ];
     
         return [
             'symbol' => $symbol,
             'performance' => $performance,
             'price' => $latestEODPrice,
             'volume' => $latestEODVolume,
-            'volumeWeekly' => $latestEODVolume,
+            'volumeWeekly' => $weekly[0]['volume'],
         ];
     }
     
